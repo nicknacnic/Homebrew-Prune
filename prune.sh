@@ -4,6 +4,7 @@
 default_date="20220101"
 compare_date=$(date -j -f "%Y%m%d" "$default_date" +"%s")
 test_mode=0
+prune_count=0
 
 # Help menu
 print_help() {
@@ -34,32 +35,56 @@ while getopts "d:th" opt; do
     esac
 done
 
-# Rest of the script...
-# [The script logic remains the same, except for the uninstallation part]
-
-# Function to check last access time and (un)install if older than specified date
-check_and_uninstall() {
-    # [Function body remains the same]
-
-    if [ "$last_access_date" -lt "$compare_date" ]; then
-        if [ "$test_mode" -eq 1 ]; then
-            echo "$package_name would be removed (last accessed on $last_access_str)." | tee -a "$output_file"
-        else
-            echo "$package_name last accessed on $last_access_str, uninstalling..." | tee -a "$output_file"
-            brew uninstall "$package_name"
-            echo "$package_name successfully removed." | tee -a "$output_file"
-        fi
-    else
-        echo "$package_name last accessed on $last_access_str, keeping it." >> "$output_file"
-    fi
-}
-
-# [Rest of the script logic]
-
 # Check if no options were provided
 if [ $OPTIND -eq 1 ]; then
     print_help
     exit 1
 fi
 
-# [Rest of the script logic]
+# Debugging
+echo "Debug: compare_date=$compare_date, test_mode=$test_mode"
+
+# Main logic
+echo "Starting main logic"
+for package in $(brew list); do
+    echo "Processing package: $package"
+
+    # Check for executable or library
+    executable_path="/usr/local/bin/$package"
+    lib_path="/usr/local/lib/lib$package.dylib"
+    file_path=""
+
+    if [ -f "$executable_path" ]; then
+        file_path="$executable_path"
+    elif [ -f "$lib_path" ]; then
+        file_path="$lib_path"
+    fi
+
+    if [ -n "$file_path" ]; then
+        # Get last access time of the file
+        last_access_str=$(stat -f "%Sm" -t "%b %d %Y" "$file_path")
+        last_access_date=$(date -j -f "%b %d %Y" "$last_access_str" +"%s")
+
+        echo "Last access date for $package: $last_access_str"
+
+        if [ "$last_access_date" -lt "$compare_date" ]; then
+            if [ "$test_mode" -eq 1 ]; then
+                echo "$package would be removed (last accessed on $last_access_str)."
+                ((prune_count++))
+            else
+                echo "$package last accessed on $last_access_str, uninstalling..."
+                brew uninstall "$package"
+                echo "$package successfully removed."
+            fi
+        fi
+    else
+        echo "No executable or library found for $package."
+    fi
+done
+
+# Final output
+if [ "$prune_count" -eq 0 ]; then
+    echo "No packages found that meet the criteria for pruning."
+else
+    echo "$prune_count packages would be pruned."
+fi
