@@ -2,7 +2,9 @@
 A tool that identifies installed homebrew formulae, when they were last accessed, and removes them based off set date of expiry. 
 
 ## prune
-```brew-autoremove``` removes orphaned dependencies, ```brew cleanup``` removes outdated formulae and clears old downloads/logs/cache. These are definitely un-needed, but what about 'actively updated' not orphaned packages you don't use anymore? Enter prune.
+
+> [!NOTE]
+> ```brew-autoremove``` removes orphaned dependencies, ```brew cleanup``` removes outdated formulae and clears old downloads/logs/cache. These are definitely un-needed, but what about 'actively updated' not orphaned packages you don't use anymore? Enter prune.
 
 ## Usage
 
@@ -14,10 +16,13 @@ Install the formulae.
 ```brew install prune```
 
 Run the formulae.
-```prune```
+```prune -h```
 
 ## Example
-```prune 20210101``` will find all items prior to 1 Jan 2021 and prune them. Use -t for test / dry-run purposes.
+```prune -d 20210101``` will find all items prior to 1 Jan 2021 and prune them. 
+
+> [!TIP]
+> Use -t for test / dry-run purposes. ```prune -d 20210101 -t```
 
 ### Overview:
 This script is designed to help clean up your macOS system by uninstalling Homebrew packages that haven't been used for a significant amount of time. 
@@ -39,11 +44,17 @@ The script operates in several steps:
 
 8. Logging: All actions, including checks, uninstallations, and any errors (like missing files), are logged to an output file (brew_package_usage.txt) for review.
 
-### Important Notes:
+### Notes:
+> [!IMPORTANT]
+> Backup: Before running this script, ensure you have a backup of your system or at least a list of installed packages. The script will uninstall software based on the last access date, which might sometimes lead to the removal of packages still needed.
 
-Backup: Before running this script, ensure you have a backup of your system or at least a list of installed packages. The script will uninstall software based on the last access date, which might sometimes lead to the removal of packages still needed.
+> [!WARNING]
+> Date Formats: The script assumes specific date formats for the ls -lu output. If your system uses a different format, the script might need adjustments.
 
-Date Formats: The script assumes specific date formats for the ls -lu output. If your system uses a different format, the script might need adjustments.
+> [!CAUTION]
+> Manual Review Recommended: It's advisable to manually review the list of packages to be uninstalled before running the script, especially if you have critical Homebrew packages installed.
 
-Manual Review Recommended: It's advisable to manually review the list of packages to be uninstalled before running the script, especially if you have critical Homebrew packages installed.
-
+## To Do
+- [ ] Add casks to logic 
+- [ ] Use built-in brew commands to locate non-default-location packages
+- [ ] Schedule function (spring cleaning)
