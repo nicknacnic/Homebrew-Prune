@@ -2,7 +2,7 @@ class Prune < Formula
   desc "A script to uninstall Homebrew packages not accessed since a specified date"
   homepage "https://github.com/nicknacnic/Homebrew-Prune"
   url "https://github.com/nicknacnic/Homebrew-Prune/archive/refs/tags/1.0.0.zip"
-  sha256 "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"
+  sha256 "e34314380f6a246d8a651be8b7250e4f6b45e008e834ca27a1374c085f3ae0be"
 
   def install
     bin.install "prune.sh"
