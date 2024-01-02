@@ -1,7 +1,29 @@
 # homebrew-prune 🍺
 A tool that identifies installed homebrew formulae, when they were last accessed, and removes them based off set date of expiry. 
+A tool that identifies installed homebrew formulae, when they were last accessed, and removes them based off set date of expiry. 
 
 ## prune
+
+> [!NOTE]
+> ```brew-autoremove``` removes orphaned dependencies, ```brew cleanup``` removes outdated formulae and clears old downloads/logs/cache. These are definitely un-needed, but what about 'actively updated' not orphaned packages you don't use anymore? Enter prune.
+
+## Usage
+
+### Installation:
+Tap the formulae.
+```brew tap nicknacnic/prune```
+
+Install the formulae.
+```brew install prune```
+
+Run the formulae.
+```prune -h```
+
+## Example
+```prune -d 20210101``` will find all items prior to 1 Jan 2021 and prune them. 
+
+> [!TIP]
+> Use -t for test / dry-run purposes. ```prune -d 20210101 -t```
 
 > [!NOTE]
 > ```brew-autoremove``` removes orphaned dependencies, ```brew cleanup``` removes outdated formulae and clears old downloads/logs/cache. These are definitely un-needed, but what about 'actively updated' not orphaned packages you don't use anymore? Enter prune.
@@ -54,6 +76,11 @@ The script operates in several steps:
 > [!CAUTION]
 > Manual Review Recommended: It's advisable to manually review the list of packages to be uninstalled before running the script, especially if you have critical Homebrew packages installed.
 
+## To Do
+- [ ] Add casks to logic 
+- [ ] Use built-in brew commands to locate non-default-location packages
+- [ ] Schedule function (spring cleaning)
+- [ ] brew pin catch
 ## To Do
 - [ ] Add casks to logic 
 - [ ] Use built-in brew commands to locate non-default-location packages
