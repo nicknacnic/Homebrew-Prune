@@ -1,7 +1,7 @@
-# Homebrew-Prune
-A utility that identifies installed home-brew formulae, when they were last accessed, and removes them. 
+# homebrew-prune 🍺
+A utility that identifies installed homebrew formulae, when they were last accessed, and removes them based off set date of expiry. 
 
-## Homebrew Prune (prune.sh)
+## prune
 
 ### Overview:
 This script is designed to help clean up your macOS system by uninstalling Homebrew packages that haven't been used for a significant amount of time. 
@@ -23,15 +23,15 @@ The script operates in several steps:
 
 8. Logging: All actions, including checks, uninstallations, and any errors (like missing files), are logged to an output file (brew_package_usage.txt) for review.
 
-### Usage:
-To use this script:
+### Installation:
+Tap the formulae.
+```brew tap nicknacnic/prune```
 
-Ensure you have Homebrew installed and that it's up to date.
-Copy the script ```git clone https://github.com/nicknacnic/Homebrew-Prune```
-Make the script executable: ```chmod +x prune.sh```
-Run the script with a -d date flag in YYYYMMDD format: ```./prune.sh -d YYYYMMDD```
-Use the ```-t``` for a dry-run testing mode.
-Review the brew_package_usage.txt file to see which packages were uninstalled or kept.
+Install the formulae.
+```brew install prune```
+
+Run the formulae.
+```prune```
 
 ### Important Notes:
 
