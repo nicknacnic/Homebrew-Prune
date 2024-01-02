@@ -29,6 +29,17 @@ parse_and_compare_date() {
     fi
 }
 
+# Function to check dependencies before uninstalling
+check_dependencies() {
+    local package_name=$1
+    if brew uses --installed "$package_name" | grep -q "$package_name"; then
+        echo "$package_name is required by other installed packages. Skipping uninstallation." | tee -a "$output_file"
+        return 1 # Dependencies found
+    else
+        return 0 # No dependencies
+    fi
+}
+
 # Function to check last access time and uninstall if older than 2022
 check_and_uninstall() {
     local file_path=$1
@@ -37,7 +48,7 @@ check_and_uninstall() {
         # Get last access time of the file
         local last_access_str=$(ls -lu "$file_path" | awk '{print $6, $7, $8}')
 
-        if parse_and_compare_date "$last_access_str"; then
+        if parse_and_compare_date "$last_access_str" && check_dependencies "$package_name"; then
             echo "$package_name last accessed on $last_access_str, uninstalling..." | tee -a "$output_file"
             brew uninstall "$package_name"
             echo "$package_name successfully removed." | tee -a "$output_file"
