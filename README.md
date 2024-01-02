@@ -5,6 +5,8 @@ A tool that identifies installed homebrew formulae, when they were last accessed
 ## prune
 ```brew-autoremove``` removes orphaned dependencies, ```brew cleanup``` removes outdated formulae and clears old downloads/logs/cache. These are definitely un-needed, but what about 'actively updated' not orphaned packages you don't use anymore? Enter prune.
 
+## Usage
+
 ### Installation:
 Tap the formulae.
 ```brew tap nicknacnic/prune```
@@ -14,6 +16,12 @@ Install the formulae.
 
 Run the formulae.
 ```prune```
+
+## Example
+```prune 20210101``` will find all items prior to 1 Jan 2021 and prune them. Use -t for test / dry-run purposes.
+
+## Example
+```prune 20210101``` will find all items prior to 1 Jan 2021 and prune them. Use -t for test / dry-run purposes.
 
 > [!NOTE]
 > ```brew-autoremove``` removes orphaned dependencies, ```brew cleanup``` removes outdated formulae and clears old downloads/logs/cache. These are definitely un-needed, but what about 'actively updated' not orphaned packages you don't use anymore? Enter prune.
