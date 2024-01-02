@@ -36,5 +36,6 @@ Review the brew_package_usage.txt file to see which packages were uninstalled or
 Backup: Before running this script, ensure you have a backup of your system or at least a list of installed packages. The script will uninstall software based on the last access date, which might sometimes lead to the removal of packages still needed.
 
 Date Formats: The script assumes specific date formats for the ls -lu output. If your system uses a different format, the script might need adjustments.
+
 Manual Review Recommended: It's advisable to manually review the list of packages to be uninstalled before running the script, especially if you have critical Homebrew packages installed.
 
