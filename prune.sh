@@ -20,10 +20,28 @@ print_help() {
     echo "  -t        Test mode. Display packages that would be deleted without actually deleting them."
 }
 
+# Get the list of pinned packages
+pinned_packages=$(brew list --pinned)
+
+# Function to check if a package is pinned
+is_pinned() {
+    local package=$1
+    if [[ $pinned_packages == *"$package"* ]]; then
+        return 0 # 0 means true in shell script
+    else
+        return 1 # 1 means false
+    fi
+}
+
 # Process packages
 process_packages() {
     echo "Starting main logic for packages"
     for package in $(brew list --formula); do
+        echo "Processing package: $package"
+        if is_pinned "$package"; then
+            echo "Package $package is pinned and will not be pruned."
+            continue
+        fi
 
     # Find the installation path of the package
     install_path=$(brew --prefix $package)
@@ -85,6 +103,10 @@ process_casks() {
     echo "Starting main logic for casks"
     for cask in $(brew list --cask); do
         echo "Processing cask: $cask"
+        if is_pinned "$cask"; then
+            echo "Cask $cask is pinned and will not be pruned."
+            continue
+        fi
 
         # Find the application path using the find_app_path function
         app_path=$(find_app_path "$cask")
