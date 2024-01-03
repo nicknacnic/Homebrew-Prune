@@ -49,36 +49,34 @@ echo "Starting main logic"
 for package in $(brew list); do
     echo "Processing package: $package"
 
-    # Check for executable or library
-    executable_path="/usr/local/bin/$package"
-    lib_path="/usr/local/lib/lib$package.dylib"
-    file_path=""
+    # Find the installation path of the package
+    install_path=$(brew --prefix $package)
+    echo "Package $package is installed at: $install_path"
 
-    if [ -f "$executable_path" ]; then
-        file_path="$executable_path"
-    elif [ -f "$lib_path" ]; then
-        file_path="$lib_path"
+    # Find the main executable of the package (if it exists in PATH)
+    executable_path=$(which $package)
+    if [ -n "$executable_path" ]; then
+        echo "Executable for $package found at: $executable_path"
+    else
+        echo "No executable found in PATH for $package"
+        continue # Skip to the next package if no executable is found
     fi
 
-    if [ -n "$file_path" ]; then
-        # Get last access time of the file
-        last_access_str=$(stat -f "%Sm" -t "%b %d %Y" "$file_path")
-        last_access_date=$(date -j -f "%b %d %Y" "$last_access_str" +"%s")
+    # Get last access time of the executable
+    last_access_str=$(stat -f "%Sm" -t "%b %d %Y" "$executable_path")
+    last_access_date=$(date -j -f "%b %d %Y" "$last_access_str" +"%s")
 
-        echo "Last access date for $package: $last_access_str"
+    echo "Last access date for $package: $last_access_str"
 
-        if [ "$last_access_date" -lt "$compare_date" ]; then
-            if [ "$test_mode" -eq 1 ]; then
-                echo "$package would be removed (last accessed on $last_access_str)."
-                ((prune_count++))
-            else
-                echo "$package last accessed on $last_access_str, uninstalling..."
-                brew uninstall "$package"
-                echo "$package successfully removed."
-            fi
+    if [ "$last_access_date" -lt "$compare_date" ]; then
+        if [ "$test_mode" -eq 1 ]; then
+            echo "$package would be removed (last accessed on $last_access_str)."
+            ((prune_count++))
+        else
+            echo "$package last accessed on $last_access_str, uninstalling..."
+            brew uninstall "$package"
+            echo "$package successfully removed."
         fi
-    else
-        echo "No executable or library found for $package."
     fi
 done
 
