@@ -1,23 +1,99 @@
 #!/bin/bash
 
-# Calculate the date two years ago
-default_date=$(date -v-2y +%Y%m%d)
-compare_date=$(date -j -f "%Y%m%d" "$default_date" +"%s")
+# Variables
 test_mode=0
+verbose_mode=0
 process_casks=0
 process_packages=0
 package_prune_count=0
 cask_prune_count=0
+total_size_kb=0
+DAYS_THRESHOLD=730
+current_datetime=$(date)
+uninstalled_list="uninstalled_packages.txt"
+
+# Logging function
+log_message() {
+    echo "$1" >> brew_package_usage.txt
+    if [ "$verbose_mode" -eq 1 ]; then
+        echo "$1"
+    fi
+}
+
+# Check for jq dependency
+if ! command -v jq &> /dev/null; then
+    echo "'jq' is required for this script to run."
+    read -p "Do you want to install 'jq'? [Y/n] " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ || -z $REPLY ]]; then
+        brew install jq
+    else
+        echo "Unable to proceed without 'jq'. Exiting."
+        exit 1
+    fi
+fi
+
+# Function to calculate the date two years prior
+calculate_default_date() {
+    # Get the current date in YYYY-MM-DD format
+    local current_date=$(date +%Y-%m-%d)
+
+    # Extract year, month, and day
+    local year=$(echo $current_date | cut -d '-' -f 1)
+    local month=$(echo $current_date | cut -d '-' -f 2)
+    local day=$(echo $current_date | cut -d '-' -f 3)
+
+    # Subtract two years from the current year
+    local year_two_years_ago=$((year - 2))
+
+    # Return the date in YYYYMMDD format
+    echo "${year_two_years_ago}${month}${day}"
+}
+
+# Calculate the default date (two years prior to the current date)
+default_date=$(calculate_default_date)
+
+# Initially set compare_date to default_date
+compare_date=$default_date
 
 # Help menu
 print_help() {
     echo "Usage: $0 [-a] [-c] [-d date] [-h] [-p] [-t]"
-    echo "  -a        Process all (both packages and casks)."
-    echo "  -c        Include Homebrew casks in the pruning process."
+    echo ""
+    echo "  -a        Prune all (both packages and casks)."
+    echo "  -c        Prune only casks."
     echo "  -d date   Specify a date (format YYYYMMDD) to prune packages not accessed since that date."
-    echo "  -h        Display this help and exit."
-    echo "  -p        Include Homebrew packages in the pruning process."
-    echo "  -t        Test mode. Display packages that would be deleted without actually deleting them."
+    echo "  -g        Generate a test case cask and package to be pruned."
+    echo "  -h        Display the help menu."
+    echo "  -p        Prune only packages."
+    echo "  -r        Reinstall pruned packages and casks from uninstalled_packages.txt (requires pruning first)."
+    echo "            If used with -t, displays what would be reinstalled."
+    echo "  -t        Test mode. Display prune targets without deleting them."
+    echo "  -v        Verbose mode."    
+}
+
+# Function to get the last opened date of an application using find
+get_last_opened_date() {
+    local app_path=$1
+    local last_opened_str
+
+    # Check if the app path is valid
+    if [ ! -d "$app_path" ]; then
+        log_message "Application path for $app_path does not exist."
+        echo "0"  # Return 0 if the path is not valid
+        return
+    fi
+
+    # Get the last opened date using find
+    last_opened_str=$(find "$app_path" -type f -exec stat -f "%Sm" -t "%Y-%m-%d" {} + 2>/dev/null)
+    if [ -n "$last_opened_str" ]; then
+        # Find the most recent last opened date among files
+        last_opened_date=$(echo "$last_opened_str" | sort -r | head -n 1)
+        echo "$last_opened_date"
+    else
+        log_message "No valid last opened date available for $app_path."
+        echo "0"  # Return 0 if no valid date is found
+    fi
 }
 
 # Get the list of pinned packages
@@ -33,113 +109,143 @@ is_pinned() {
     fi
 }
 
+# Function to calculate the date in seconds since the epoch for the compare_date
+calculate_compare_date_epoch() {
+    compare_date_epoch=$(date -j -f "%Y%m%d" "$compare_date" +"%s")
+}
+
+# ...
+
 # Process packages
 process_packages() {
-    echo "Starting main logic for packages"
+    # Calculate the compare_date_epoch
+    calculate_compare_date_epoch
+
+    log_message "Starting main logic for packages"
     for package in $(brew list --formula); do
-        echo "Processing package: $package"
+        log_message "Processing package: $package"
         if is_pinned "$package"; then
-            echo "Package $package is pinned and will not be pruned."
+            log_message "Package $package is pinned and will not be pruned."
             continue
         fi
 
-    # Find the installation path of the package
-    install_path=$(brew --prefix $package)
-    echo "Package $package is installed at: $install_path"
+        # Find the installation path of the package
+        install_path=$(brew --prefix $package)
+        log_message "Package $package is installed at: $install_path"
 
-    # Find the main executable of the package (if it exists in PATH)
-    executable_path=$(which $package)
-    if [ -n "$executable_path" ]; then
-        echo "Executable for $package found at: $executable_path"
-    else
-        echo "No executable found in PATH for $package"
-        continue # Skip to the next package if no executable is found
-    fi
-
-    # Get last access time of the executable
-    last_access_str=$(stat -f "%Sm" -t "%b %d %Y" "$executable_path")
-    last_access_date=$(date -j -f "%b %d %Y" "$last_access_str" +"%s")
-
-    echo "Last access date for $package: $last_access_str"
-
-    if [ "$last_access_date" -lt "$compare_date" ]; then
-        if [ "$test_mode" -eq 1 ]; then
-            echo "$package would be removed (last accessed on $last_access_str)."
-            ((package_prune_count++))
+        # Find the main executable of the package (if it exists in PATH)
+        executable_path=$(which $package)
+        if [ -n "$executable_path" ]; then
+            log_message "Executable for $package found at: $executable_path"
+            # Get last access time of the executable
+            last_access_str=$(stat -f "%Sm" -t "%b %d %Y" "$executable_path")
+            last_access_date=$(date -j -f "%b %d %Y" "$last_access_str" +"%s")
+            log_message "Last access date for $package: $last_access_str"
         else
-            echo "$package last accessed on $last_access_str, uninstalling..."
-            brew uninstall "$package"
-            echo "$package successfully removed."
+            log_message "No executable found in PATH for $package, skipping..."
+            continue # Skip to the next package if no executable is found
         fi
-    fi
-done
+
+        if [ -n "$last_access_date" ] && [ "$last_access_date" -lt "$compare_date_epoch" ]; then
+            log_message "Calculating size for $package..."
+            # Calculate the size of the package using 'du' command
+            local size_kb=$(du -sk "$install_path" | cut -f1)
+            log_message "Size calculated for $package: $size_kb KB"
+            total_size_kb=$((total_size_kb + size_kb))
+            
+            if [ "$test_mode" -eq 1 ]; then
+                log_message "$package would be removed (last accessed on $last_access_str)."
+                ((package_prune_count++))
+            else
+                log_message "$package last accessed on $last_access_str, uninstalling..."
+                log_message "$package" >> "$uninstalled_list"
+                brew uninstall "$package"
+                log_message "$package successfully removed."
+            fi
+        else
+            log_message "Package $package has been used after $compare_date or has no valid last access date."
+        fi
+    done
 }
 
 # Function to find the application path for a given cask
 find_app_path() {
     local cask_name=$1
     local app_name
+    local found_app=""
 
-    # Try direct match first
-    if [ -d "/Applications/${cask_name}.app" ]; then
-        echo "/Applications/${cask_name}.app"
-        return
+    # Extract the application name from Homebrew cask metadata
+    app_name=$(brew info --json=v2 --cask "$cask_name" | jq -r '.casks[0].artifacts[] | select(has("app")) | .app[0]')
+
+    # Construct the application path
+    if [ -n "$app_name" ]; then
+        found_app="/Applications/${app_name}"
     fi
 
-    # Try case-insensitive and partial match using awk
-    for app in /Applications/*.app; do
-        app_name=$(basename "$app" .app)
-        if echo "$app_name" | awk -v cask="$cask_name" 'tolower($0) ~ tolower(cask) {exit}' ; then
-            echo "$app"
-            return
-        fi
-    done
-
-    echo ""
+    # Return the found path or an empty string if no match was found
+    if [ -n "$found_app" ] && [ -d "$found_app" ]; then
+        echo "$found_app"
+    else
+        echo ""
+    fi
 }
 
 # Process casks
 process_casks() {
-    echo "Starting main logic for casks"
+    log_message "Starting main logic for casks"
     for cask in $(brew list --cask); do
-        echo "Processing cask: $cask"
+        log_message "Processing cask: $cask"
         if is_pinned "$cask"; then
-            echo "Cask $cask is pinned and will not be pruned."
+            log_message "Cask $cask is pinned and will not be pruned."
             continue
         fi
 
         # Find the application path using the find_app_path function
         app_path=$(find_app_path "$cask")
         if [ -n "$app_path" ]; then
-            # Get the last used date using mdls
-            last_used_str=$(mdls -name kMDItemLastUsedDate "$app_path" | awk '{print $3}')
-            if [[ "$last_used_str" != "(null)" && -n "$last_used_str" ]]; then
-                last_used_date=$(date -j -f "%Y-%m-%d" "$last_used_str" +"%s")
-                echo "Last used date for $cask: $last_used_str"
+            # Get the last used date using the get_last_opened_date function
+            last_used_date=$(get_last_opened_date "$app_path")
 
-                # Compare last used date with compare_date
-                if [ "$last_used_date" -lt "$compare_date" ]; then
+            # Check if last_used_date is a valid date
+            if [[ "$last_used_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+                # Convert compare_date to YYYY-MM-DD format for comparison
+                compare_date_hyphenated=$(date -j -f "%Y%m%d" "$compare_date" +"%Y-%m-%d")
+
+                if [ "$last_used_date" \< "$compare_date_hyphenated" ]; then
+                    log_message "Calculating size for $cask..."
+                    # Calculate cask size by checking the application bundle size
+                    local size=$(du -sk "$app_path" | cut -f1)
+                    log_message "Size calculated for $cask: $size KB"
+                    total_size_kb=$((total_size_kb + size/1024))
+
                     if [ "$test_mode" -eq 1 ]; then
-                        echo "$cask would be removed (last used on $last_used_str)."
+                        log_message "$cask would be removed (last used on $last_used_date)."
                         ((cask_prune_count++))
                     else
-                        echo "$cask last used on $last_used_str, uninstalling..."
+                        log_message "$cask last used on $last_used_date, uninstalling..."
+                        log_message "$cask" >> "$uninstalled_list"
                         brew uninstall --cask "$cask"
-                        echo "$cask successfully removed."
-                       ((cask_prune_count++))
+                        log_message "$cask successfully removed."
+                        ((cask_prune_count++))
                     fi
+                else
+                    log_message "No action taken for $cask (last used on $last_used_date)."
                 fi
             else
-                echo "No valid last used date available for $cask."
+                log_message "No valid last used date available for $cask."
             fi
         else
-            echo "Application for cask $cask not found in /Applications."
+            log_message "Application for cask $cask not found in /Applications."
         fi
     done
 }
 
+# Run processing functions based on flags
+[ "$process_packages" -eq 1 ] && process_packages
+[ "$process_casks" -eq 1 ] && process_casks
+
 # Parse options
-while getopts "d:acpth" opt; do
+while getopts "d:acpthrvg" opt; do
     case $opt in
         a)
             process_casks=1
@@ -149,7 +255,20 @@ while getopts "d:acpth" opt; do
             process_casks=1
             ;;
         d)
-            compare_date=$(date -j -f "%Y%m%d" "$OPTARG" +"%s")
+            # Update compare_date based on the user-provided date
+            compare_date=$(date -j -f "%Y%m%d" "$OPTARG" +"%Y%m%d")
+            ;;
+        g)
+            echo "Installing test package and cask."
+            log_message "Installing test cask 'penc'"
+            brew install --cask penc
+            log_message "Modifying last open date to 201501010000"
+            touch -t 201501010000 /Applications/Penc.app
+            log_message "Installing test package 'briss'"
+            brew install countdown
+            log_message "Modifying last open date to 201501010000"
+            touch -t 201501010000 /usr/local/bin/countdown
+            echo "Install successful, run prune with -t to find penc and briss."    
             ;;
         h)
             print_help
@@ -158,8 +277,25 @@ while getopts "d:acpth" opt; do
         p)
             process_packages=1
             ;;
+        r)
+            if [ "$test_mode" -eq 1 ]; then
+                echo "Test mode is active. The following packages/casks would be reinstalled:"
+                cat "$uninstalled_list" || echo "No packages/casks to reinstall."
+            elif [ -f "$uninstalled_list" ]; then
+                while read -r line; do
+                    brew install "$line"
+                    log_message "Reinstalled $line"
+                done < "$uninstalled_list"
+            else
+                log_message "No uninstalled packages to reinstall."
+            fi
+            exit 0
+            ;;
         t)
             test_mode=1
+            ;;
+        v)
+            verbose_mode=1
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
@@ -169,22 +305,47 @@ while getopts "d:acpth" opt; do
     esac
 done
 
+# Set default_date and compare_date if not set by -d flag
+if [ -z "$compare_date" ]; then
+    default_date=$(calculate_default_date)
+    compare_date=$default_date
+fi
+
+
+# Logging 
+log_message ""
+log_message "Pruned on $current_datetime"
+log_message ""
+log_message "Verbose Information: (1 = yes | 0 = no)"
+log_message ""
+log_message "Test Mode = $test_mode, Process Casks = $process_casks, Process Packages = $process_packages"
+log_message ""
+log_message "Default Date (YYYYMMDD): $default_date"
+log_message "Compare date (YYYYMMDD): $compare_date"
+log_message ""
+
 # Check if no options were provided
 if [ $OPTIND -eq 1 ]; then
     print_help
     exit 1
 fi
 
-# Debugging
-echo "Debug: compare_date=$compare_date, test_mode=$test_mode, process_casks=$process_casks, process_packages=$process_packages"
-
 # Run processing functions based on flags
 [ "$process_packages" -eq 1 ] && process_packages
 [ "$process_casks" -eq 1 ] && process_casks
 
-# Final output
 if [ "$package_prune_count" -eq 0 ] && [ "$cask_prune_count" -eq 0 ]; then
     echo "No packages or casks found that meet the criteria for pruning."
 else
-    echo "$package_prune_count packages and $cask_prune_count casks would be pruned."
+    total_size_kb_total=$((total_size_kb + total_size_cask_kb))
+    
+    if [ "$package_prune_count" -gt 0 ]; then
+        echo "$package_prune_count packages would be pruned."
+    fi
+
+    if [ "$cask_prune_count" -gt 0 ]; then
+        echo "$cask_prune_count casks would be pruned."
+    fi
+
+    echo "Total space that would be freed: $(convert_size $total_size_kb_total)"
 fi
