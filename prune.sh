@@ -155,29 +155,40 @@ process_packages() {
             last_access_str=$(stat -f "%Sm" -t "%b %d %Y" "$executable_path")
             last_access_date=$(date -j -f "%b %d %Y" "$last_access_str" +"%s")
             log_message "Last access date for $package: $last_access_str"
-        else
-            log_message "No executable found in PATH for $package, skipping..."
-            continue # Skip to the next package if no executable is found
-        fi
 
-        if [ -n "$last_access_date" ] && [ "$last_access_date" -lt "$compare_date_epoch" ]; then
-            log_message "Calculating size for $package..."
-            # Calculate the size of the package using 'du' command
-            local size_kb=$(du -sk "$install_path" | cut -f1)
-            log_message "Size calculated for $package: $size_kb KB"
-            total_size_kb=$((total_size_kb + size_kb))
-            
-            if [ "$test_mode" -eq 1 ]; then
-                log_message "$package would be removed (last accessed on $last_access_str)."
-                ((package_prune_count++))
+            # Calculate the size of the installation path using 'du' command
+            local install_size_kb=$(du -sk "$install_path" | cut -f1)
+            log_message "Size calculated for $package installation path: $install_size_kb KB"
+
+            # Calculate the size of the executable using 'du' command
+            local exec_size_kb=$(du -sk "$executable_path" | cut -f1)
+            log_message "Size calculated for $package executable: $exec_size_kb KB"
+
+            # Choose the non-zero size for incrementing
+            if [ "$install_size_kb" -gt 0 ]; then
+                size_kb=$((size_kb + install_size_kb))
+            elif [ "$exec_size_kb" -gt 0 ]; then
+                size_kb=$((size_kb + exec_size_kb))
+            fi
+
+            if [ -n "$last_access_date" ] && [ "$last_access_date" -lt "$compare_date_epoch" ]; then
+                log_message "Calculating size for $package..."
+                total_size_kb=$((total_size_kb + size_kb))
+                
+                if [ "$test_mode" -eq 1 ]; then
+                    log_message "$package would be removed (last accessed on $last_access_str)."
+                    ((package_prune_count++))
+                else
+                    log_message "$package last accessed on $last_access_str, uninstalling..."
+                    log_message "$package" >> "$uninstalled_list"
+                    brew uninstall "$package"
+                    log_message "$package successfully removed."
+                fi
             else
-                log_message "$package last accessed on $last_access_str, uninstalling..."
-                log_message "$package" >> "$uninstalled_list"
-                brew uninstall "$package"
-                log_message "$package successfully removed."
+                log_message "Package $package has been used after $compare_date or has no valid last access date."
             fi
         else
-            log_message "Package $package has been used after $compare_date or has no valid last access date."
+            log_message "No executable found in PATH for $package, skipping..."
         fi
     done
 }
