@@ -33,6 +33,22 @@ if ! command -v jq &> /dev/null; then
     fi
 fi
 
+# Function to convert size in KB to human-readable format
+convert_size() {
+    local size_kb=$1
+    local size_human=""
+    
+    if [ "$size_kb" -ge 1048576 ]; then
+        size_human=$(awk "BEGIN {printf \"%.2f GB\", $size_kb/1048576}")
+    elif [ "$size_kb" -ge 1024 ]; then
+        size_human=$(awk "BEGIN {printf \"%.2f MB\", $size_kb/1024}")
+    else
+        size_human="${size_kb} KB"
+    fi
+
+    echo "$size_human"
+}
+
 # Function to calculate the date two years prior
 calculate_default_date() {
     # Get the current date in YYYY-MM-DD format
@@ -113,8 +129,6 @@ is_pinned() {
 calculate_compare_date_epoch() {
     compare_date_epoch=$(date -j -f "%Y%m%d" "$compare_date" +"%s")
 }
-
-# ...
 
 # Process packages
 process_packages() {
@@ -214,10 +228,9 @@ process_casks() {
                 if [ "$last_used_date" \< "$compare_date_hyphenated" ]; then
                     log_message "Calculating size for $cask..."
                     # Calculate cask size by checking the application bundle size
-                    local size=$(du -sk "$app_path" | cut -f1)
-                    log_message "Size calculated for $cask: $size KB"
-                    total_size_kb=$((total_size_kb + size/1024))
-
+                    local size_kb=$(du -sk "$app_path" | cut -f1)
+                    log_message "Size calculated for $cask: $size_kb KB"
+                    total_size_cask_kb=$((total_size_cask_kb + size_kb))
                     if [ "$test_mode" -eq 1 ]; then
                         log_message "$cask would be removed (last used on $last_used_date)."
                         ((cask_prune_count++))
@@ -334,6 +347,10 @@ fi
 [ "$process_packages" -eq 1 ] && process_packages
 [ "$process_casks" -eq 1 ] && process_casks
 
+# Final Debugging
+echo "Debug: total_size_kb=$total_size_kb, total_size_cask_kb=$total_size_cask_kb, package_prune_count=$package_prune_count, cask_prune_count=$cask_prune_count"
+
+# Final output
 if [ "$package_prune_count" -eq 0 ] && [ "$cask_prune_count" -eq 0 ]; then
     echo "No packages or casks found that meet the criteria for pruning."
 else
@@ -348,4 +365,12 @@ else
     fi
 
     echo "Total space that would be freed: $(convert_size $total_size_kb_total)"
+
+    if [ "$package_prune_count" -gt 0 ]; then
+        echo "Total space freed from packages: $(convert_size $total_size_kb)"
+    fi
+
+    if [ "$cask_prune_count" -gt 0 ]; then
+        echo "Total space freed from casks: $(convert_size $total_size_cask_kb)"
+    fi
 fi
