@@ -1,6 +1,5 @@
 # homebrew-prune 🍺
 A tool that identifies installed homebrew formulae, when they were last accessed, and removes them based off set date of expiry. 
-A tool that identifies installed homebrew formulae, when they were last accessed, and removes them based off set date of expiry. 
 
 ## prune
 
@@ -41,7 +40,6 @@ The script operates in several steps:
 6. **Conditional Uninstallation:** If a package's last access date is before the comparison date, the script uninstalls the package using `brew uninstall`.
 
 7. **Logging:** All actions, including checks, uninstallations, and any errors (like missing files), are logged to an output file (`brew_package_usage.txt`) for review.
-8. Logging: All actions, including checks, uninstallations, and any errors (like missing files), are logged to an output file (brew_package_usage.txt) for review.
 
 ### Notes:
 > [!IMPORTANT]
