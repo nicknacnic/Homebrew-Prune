@@ -20,19 +20,6 @@ log_message() {
     fi
 }
 
-# Check for jq dependency
-if ! command -v jq &> /dev/null; then
-    echo "'jq' is required for this script to run."
-    read -p "Do you want to install 'jq'? [Y/n] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ || -z $REPLY ]]; then
-        brew install jq
-    else
-        echo "Unable to proceed without 'jq'. Exiting."
-        exit 1
-    fi
-fi
-
 # Function to convert size in KB to human-readable format
 convert_size() {
     local size_kb=$1
