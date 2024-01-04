@@ -335,7 +335,6 @@ if [ -z "$compare_date" ]; then
     compare_date=$default_date
 fi
 
-
 # Logging 
 log_message ""
 log_message "Pruned on $current_datetime"
@@ -346,6 +345,8 @@ log_message "Test Mode = $test_mode, Process Casks = $process_casks, Process Pac
 log_message ""
 log_message "Default Date (YYYYMMDD): $default_date"
 log_message "Compare date (YYYYMMDD): $compare_date"
+log_message ""
+log_message "Debug: total_size_kb=$total_size_kb, total_size_cask_kb=$total_size_cask_kb, package_prune_count=$package_prune_count, cask_prune_count=$cask_prune_count"
 log_message ""
 
 # Check if no options were provided
@@ -358,30 +359,39 @@ fi
 [ "$process_packages" -eq 1 ] && process_packages
 [ "$process_casks" -eq 1 ] && process_casks
 
-# Final Debugging
-echo "Debug: total_size_kb=$total_size_kb, total_size_cask_kb=$total_size_cask_kb, package_prune_count=$package_prune_count, cask_prune_count=$cask_prune_count"
-
 # Final output
 if [ "$package_prune_count" -eq 0 ] && [ "$cask_prune_count" -eq 0 ]; then
+    echo ""
     echo "No packages or casks found that meet the criteria for pruning."
+    echo ""
 else
     total_size_kb_total=$((total_size_kb + total_size_cask_kb))
     
     if [ "$package_prune_count" -gt 0 ]; then
+        echo ""
         echo "$package_prune_count packages would be pruned."
+        echo ""
     fi
 
     if [ "$cask_prune_count" -gt 0 ]; then
+        echo ""
         echo "$cask_prune_count casks would be pruned."
+        echo ""
     fi
-
+    
+    echo ""
     echo "Total space that would be freed: $(convert_size $total_size_kb_total)"
+    echo ""
 
     if [ "$package_prune_count" -gt 0 ]; then
+        echo ""
         echo "Total space freed from packages: $(convert_size $total_size_kb)"
+        echo ""
     fi
 
     if [ "$cask_prune_count" -gt 0 ]; then
+        echo ""
         echo "Total space freed from casks: $(convert_size $total_size_cask_kb)"
+        echo ""
     fi
 fi
